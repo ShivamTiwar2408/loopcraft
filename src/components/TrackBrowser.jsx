@@ -103,8 +103,6 @@ export default function TrackBrowser({
     resetPage();
   }, [resetPage]);
 
-
-
   // Format file size
   const formatFileSize = useCallback((bytes) => {
     if (!bytes) return '';

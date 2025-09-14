@@ -53,7 +53,6 @@ npm start
 ### ⚡ Performance Features
 - 🚀 **Virtual Scrolling**: Smooth performance with large track libraries
 - 💾 **Lazy Loading**: Efficient memory usage
-- 📊 **Performance Monitor**: Optional real-time performance tracking
 - 🎯 **Optimized Rendering**: Memoized components for better performance
 
 ### 🎨 User Experience
@@ -75,7 +74,6 @@ npm start
 1. **Use Folders**: Organize tracks in `public/assets/` subfolders by genre, artist, or project
 2. **Naming Convention**: Use consistent naming for better search results
 3. **Categories**: Folder names become categories automatically
-4. **Performance**: Enable performance monitor in settings for large libraries (500+ tracks)
 
 ## Technical Details
 
@@ -83,5 +81,5 @@ npm start
 - Tailwind CSS for styling
 - Automatic manifest generation with metadata
 - Optimized for handling 500+ audio tracks
-- Memory-efficient virtual scrolling
+- Memory-efficient pagination
 - Keyboard navigation support
