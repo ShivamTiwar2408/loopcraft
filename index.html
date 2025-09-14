@@ -1,0 +1,490 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Audio Segment Repeater</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <style>
+    :root{font-family:system-ui,-apple-system,Segoe UI,Roboto,"Helvetica Neue",Arial;}
+    body{margin:0;padding:18px;background:#fafafa;color:#111}
+    header{display:flex;align-items:center;gap:12px;margin-bottom:16px}
+    h1{font-size:18px;margin:0}
+    .app{display:grid;grid-template-columns:260px 1fr;gap:16px}
+    .panel{background:white;padding:12px;border-radius:8px;box-shadow:0 1px 6px rgba(0,0,0,0.06)}
+    label{display:block;margin-top:8px;font-size:13px;color:#444}
+    input[type="text"], input[type="number"], select{width:100%;box-sizing:border-box;padding:6px;margin-top:6px;border:1px solid #ddd;border-radius:6px}
+    button{padding:8px 10px;border-radius:6px;border:0;background:#1f7ae0;color:white;cursor:pointer}
+    button.ghost{background:#eee;color:#333}
+    .track-item{display:flex;align-items:center;gap:8px;padding:6px;border-radius:6px}
+    .segments{margin-top:8px}
+    table{width:100%;border-collapse:collapse}
+    th,td{padding:6px;text-align:left;font-size:13px;border-bottom:1px solid #f2f2f2}
+    .controls{display:flex;gap:8px;align-items:center;margin-top:8px}
+    .small{font-size:12px;padding:6px 8px}
+    .segment-row .actions button{margin-right:6px}
+    .current{background:#eaf4ff}
+    .meta{font-size:12px;color:#666;margin-top:8px}
+    .flex-row{display:flex;gap:8px;align-items:center}
+    .muted{color:#888;font-size:12px}
+    textarea{width:100%;height:90px;border-radius:6px;padding:8px;border:1px solid #ddd}
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Audio Segment Repeater</h1>
+    <div class="muted">— select segments, set repeats, loop the sequence</div>
+  </header>
+
+  <div class="app">
+    <!-- Left: tracks and segment creation -->
+    <div class="panel">
+      <strong>Tracks</strong>
+      <div id="tracksList" style="margin-top:8px"></div>
+
+      <label>Preview: <span id="selectedTrackName">—</span></label>
+      <div class="flex-row" style="margin-top:6px">
+        <button id="previewPlay" class="small ghost">Play</button>
+        <button id="previewPause" class="small ghost">Pause</button>
+        <button id="previewStop" class="small ghost">Stop</button>
+      </div>
+
+      <hr style="margin:10px 0">
+
+      <strong>Add segment for selected track</strong>
+      <label>Start time (mm:ss or seconds)</label>
+      <input id="startTime" type="text" placeholder="e.g. 0:10 or 10" />
+      <label>End time (mm:ss or seconds)</label>
+      <input id="endTime" type="text" placeholder="e.g. 0:30 or 30" />
+      <label>Repeat count for this segment</label>
+      <input id="repeatCount" type="number" min="1" step="1" value="1" />
+      <div style="margin-top:8px">
+        <button id="addSegmentBtn">Add Segment</button>
+      </div>
+
+      <div class="meta">Tip: times can be <code>mm:ss</code> or seconds (e.g. <code>1:20</code> or <code>80</code>).</div>
+    </div>
+
+    <!-- Right: sequence, controls, and save/load -->
+    <div class="panel">
+      <strong>Sequence (ordered)</strong>
+
+      <div class="segments" id="segmentsContainer">
+        <table id="segmentsTable">
+          <thead><tr><th>#</th><th>Track</th><th>Start</th><th>End</th><th>Repeats</th><th>Actions</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+
+      <div style="margin-top:10px;display:flex;gap:8px;align-items:center">
+        <label style="margin:0">Overall Sequence loops (0 = infinite)</label>
+        <input id="overallLoops" type="number" min="0" value="1" style="width:100px;margin-left:8px" />
+      </div>
+
+      <div class="controls">
+        <button id="playSequence">Play Sequence</button>
+        <button id="pauseSequence" class="ghost">Pause</button>
+        <button id="stopSequence" class="ghost">Stop</button>
+        <div style="margin-left:auto" class="muted" id="status">Stopped</div>
+      </div>
+
+      <div class="meta" id="progressMeta"></div>
+
+      <hr style="margin:10px 0">
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <div>
+          <strong>Save / Load sequence</strong>
+          <div style="margin-top:8px">
+            <button id="exportJson" class="small ghost">Export JSON</button>
+            <button id="importJsonBtn" class="small ghost">Import JSON</button>
+          </div>
+          <textarea id="jsonArea" placeholder="Pasted JSON or exported JSON will appear here"></textarea>
+        </div>
+
+        <div>
+          <strong>Playback info</strong>
+          <div id="playbackInfo" class="muted" style="margin-top:8px">No playback yet.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- hidden audio elements are created dynamically -->
+  <script>
+/* ===========
+   CONFIG: place your preloaded audio files here (relative paths).
+   Put the files in an `assets/` folder next to this HTML file.
+   Example files: assets/track1.mp3, assets/track2.mp3
+   =========== */
+const PRELOADED_TRACKS = [
+  { id: 't1', name: 'Track 1', src: 'assets/track1.mp3' },
+  { id: 't2', name: 'Track 2', src: 'assets/track2.mp3' }
+];
+/* =========== end CONFIG ========== */
+
+const tracksList = document.getElementById('tracksList');
+const selectedTrackName = document.getElementById('selectedTrackName');
+const previewPlay = document.getElementById('previewPlay');
+const previewPause = document.getElementById('previewPause');
+const previewStop = document.getElementById('previewStop');
+const addSegmentBtn = document.getElementById('addSegmentBtn');
+const startTimeInput = document.getElementById('startTime');
+const endTimeInput = document.getElementById('endTime');
+const repeatCountInput = document.getElementById('repeatCount');
+const segmentsTableBody = document.querySelector('#segmentsTable tbody');
+const overallLoopsInput = document.getElementById('overallLoops');
+const playSequenceBtn = document.getElementById('playSequence');
+const pauseSequenceBtn = document.getElementById('pauseSequence');
+const stopSequenceBtn = document.getElementById('stopSequence');
+const statusDiv = document.getElementById('status');
+const progressMeta = document.getElementById('progressMeta');
+const exportJsonBtn = document.getElementById('exportJson');
+const importJsonBtn = document.getElementById('importJsonBtn');
+const jsonArea = document.getElementById('jsonArea');
+const playbackInfo = document.getElementById('playbackInfo');
+
+let selectedTrackId = null;
+let trackAudioEls = {}; // id -> audio element
+let segments = []; // {id, trackId, trackName, start, end, repeats}
+let seqState = { status: 'stopped', abort: false, paused: false };
+
+function createAudioElements() {
+  PRELOADED_TRACKS.forEach(t => {
+    const audio = document.createElement('audio');
+    audio.src = t.src;
+    audio.preload = 'auto';
+    audio.controls = false;
+    audio.dataset.trackId = t.id;
+    audio.style.display = 'none';
+    document.body.appendChild(audio);
+    trackAudioEls[t.id] = audio;
+  });
+}
+
+function renderTracks() {
+  tracksList.innerHTML = '';
+  PRELOADED_TRACKS.forEach(t => {
+    const div = document.createElement('div');
+    div.className = 'track-item';
+    div.innerHTML = `<input type="radio" name="trackSelect" id="trk-${t.id}" value="${t.id}">
+                     <label for="trk-${t.id}" style="flex:1">${t.name}</label>`;
+    tracksList.appendChild(div);
+    const radio = div.querySelector('input[type=radio]');
+    radio.addEventListener('change', () => {
+      selectedTrackId = radio.value;
+      selectedTrackName.textContent = t.name;
+    });
+  });
+  // default select first
+  if (PRELOADED_TRACKS.length>0) {
+    selectedTrackId = PRELOADED_TRACKS[0].id;
+    document.querySelector(`input[name=trackSelect][value="${selectedTrackId}"]`).checked = true;
+    selectedTrackName.textContent = PRELOADED_TRACKS[0].name;
+  }
+}
+
+// UTIL: parse mm:ss or seconds to number seconds
+function parseTimeToSeconds(s) {
+  if (typeof s === 'number') return s;
+  if (!s || s.trim()==='') return NaN;
+  s = s.trim();
+  if (s.includes(':')) {
+    const parts = s.split(':').map(p => p.trim());
+    if (parts.length === 2) {
+      const m = parseInt(parts[0],10);
+      const sec = parseFloat(parts[1]);
+      if (isNaN(m) || isNaN(sec)) return NaN;
+      return m*60 + sec;
+    } else if (parts.length === 3) {
+      // hh:mm:ss
+      const h = parseInt(parts[0],10);
+      const m = parseInt(parts[1],10);
+      const sec = parseFloat(parts[2]);
+      if (isNaN(h)||isNaN(m)||isNaN(sec)) return NaN;
+      return h*3600 + m*60 + sec;
+    }
+  }
+  const n = parseFloat(s);
+  return isNaN(n) ? NaN : n;
+}
+function fmtTime(s) {
+  if (!isFinite(s) || isNaN(s)) return '--:--';
+  const mm = Math.floor(s/60);
+  const ss = Math.floor(s%60);
+  const ms = Math.floor((s - Math.floor(s)) * 1000);
+  return `${mm}:${ss.toString().padStart(2,'0')}.${String(ms).padStart(3,'0')}`;
+}
+
+function addSegment(trackId, start, end, repeats) {
+  const trk = PRELOADED_TRACKS.find(t=>t.id===trackId);
+  segments.push({
+    id: cryptoRandomId(),
+    trackId,
+    trackName: trk ? trk.name : trackId,
+    start,
+    end,
+    repeats
+  });
+  renderSegments();
+}
+
+function cryptoRandomId() {
+  return Math.random().toString(36).slice(2,9);
+}
+
+function renderSegments() {
+  segmentsTableBody.innerHTML = '';
+  segments.forEach((seg, idx) => {
+    const tr = document.createElement('tr');
+    tr.className = 'segment-row';
+    tr.dataset.segId = seg.id;
+    tr.innerHTML = `<td>${idx+1}</td>
+      <td>${escapeHtml(seg.trackName)}</td>
+      <td>${fmtTime(seg.start)}</td>
+      <td>${fmtTime(seg.end)}</td>
+      <td>${seg.repeats}</td>
+      <td class="actions">
+        <button class="ghost small" data-act="up">↑</button>
+        <button class="ghost small" data-act="down">↓</button>
+        <button class="ghost small" data-act="remove">✕</button>
+        <button class="ghost small" data-act="preview">▶ seg</button>
+      </td>`;
+    segmentsTableBody.appendChild(tr);
+
+    tr.querySelector('[data-act=up]').addEventListener('click', ()=> {
+      if (idx>0) { [segments[idx-1], segments[idx]] = [segments[idx], segments[idx-1]]; renderSegments(); }
+    });
+    tr.querySelector('[data-act=down]').addEventListener('click', ()=> {
+      if (idx < segments.length-1) { [segments[idx+1], segments[idx]] = [segments[idx], segments[idx+1]]; renderSegments(); }
+    });
+    tr.querySelector('[data-act=remove]').addEventListener('click', ()=> {
+      segments = segments.filter(s=>s.id!==seg.id); renderSegments();
+    });
+    tr.querySelector('[data-act=preview]').addEventListener('click', ()=> {
+      previewSegment(seg);
+    });
+  });
+}
+
+function escapeHtml(s){ return String(s).replace(/[&<>"]/g, c=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c])); }
+
+function previewSegment(seg) {
+  const audio = trackAudioEls[seg.trackId];
+  if (!audio) return alert('Audio not loaded for this track.');
+  audio.currentTime = Math.max(0, seg.start);
+  audio.play();
+  const onTime = ()=> {
+    if (audio.currentTime >= Math.min(seg.end, audio.duration || seg.end) - 0.03) {
+      audio.pause();
+      audio.removeEventListener('timeupdate', onTime);
+    }
+  };
+  audio.addEventListener('timeupdate', onTime);
+}
+
+/* preview controls for the selected track (not the sequence) */
+previewPlay.addEventListener('click', ()=>{
+  if (!selectedTrackId) return;
+  const aud = trackAudioEls[selectedTrackId];
+  if (!aud) return;
+  aud.play();
+});
+previewPause.addEventListener('click', ()=> {
+  if (!selectedTrackId) return;
+  trackAudioEls[selectedTrackId].pause();
+});
+previewStop.addEventListener('click', ()=> {
+  if (!selectedTrackId) return;
+  const a = trackAudioEls[selectedTrackId];
+  a.pause(); a.currentTime = 0;
+});
+
+/* Add segment button */
+addSegmentBtn.addEventListener('click', ()=>{
+  if (!selectedTrackId) return alert('Choose a track first.');
+  const st = parseTimeToSeconds(startTimeInput.value);
+  const en = parseTimeToSeconds(endTimeInput.value);
+  const repeats = Math.max(1, parseInt(repeatCountInput.value,10) || 1);
+  if (isNaN(st) || isNaN(en)) return alert('Invalid start or end times.');
+  if (en <= st) return alert('End time must be greater than start time.');
+  addSegment(selectedTrackId, st, en, repeats);
+  startTimeInput.value = '';
+  endTimeInput.value = '';
+  repeatCountInput.value = '1';
+});
+
+/* Sequence player core */
+async function playSequence() {
+  if (segments.length === 0) { alert('No segments added.'); return; }
+  seqState.status = 'playing';
+  seqState.abort = false;
+  seqState.paused = false;
+  updateStatus();
+
+  const overallLoops = Math.max(0, parseInt(overallLoopsInput.value,10) || 0); // 0 = infinite
+  let loopIndex = 0;
+  let runCount = 0;
+
+  playbackInfo.textContent = `Segments: ${segments.length}.`;
+
+  outer: for (let overall=1; ; overall++) {
+    loopIndex = overall;
+    if (overallLoops !== 0 && overall > overallLoops) break;
+    for (let si=0; si<segments.length; si++) {
+      const seg = segments[si];
+      const audio = trackAudioEls[seg.trackId];
+      if (!audio) {
+        playbackInfo.textContent = `Missing audio for ${seg.trackName} — skipping.`;
+        continue;
+      }
+      // clamp end to duration when available
+      const segEnd = (audio.duration && !isNaN(audio.duration)) ? Math.min(seg.end, audio.duration) : seg.end;
+      for (let r=1; r<=seg.repeats; r++) {
+        if (seqState.abort) break outer;
+        // wait if paused
+        await waitWhilePaused();
+        // start playing this segment iteration
+        audio.currentTime = Math.max(0, seg.start);
+        try { await audio.play(); } catch(e) {
+          // autoplay restrictions: user must interact. Already have clicks so should be ok.
+          console.warn('play failed', e);
+        }
+        playbackInfo.textContent = `Loop ${overallLoops===0? `${overall} (∞)` : `${overall} / ${overallLoops}`}, segment ${si+1}/${segments.length}, repeat ${r}/${seg.repeats} — ${seg.trackName} ${fmtTime(seg.start)} → ${fmtTime(segEnd)}`;
+        // wait until target end is reached or aborted or paused
+        const ok = await waitUntilTimeOrAbort(audio, segEnd);
+        audio.pause();
+        runCount++;
+        if (!ok) break outer;
+      }
+    }
+    // after finishing one overall loop, check whether to continue
+    if (overallLoops !== 0 && overall >= overallLoops) break;
+    if (seqState.abort) break;
+    // continue loop (or infinite)
+  }
+
+  seqState.status = 'stopped';
+  seqState.abort = false;
+  seqState.paused = false;
+  updateStatus();
+  playbackInfo.textContent = `Done. Total segment plays: ${runCount}`;
+}
+
+/* Wait until audio.currentTime >= targetEnd (with small epsilon), or until abort/paused */
+function waitUntilTimeOrAbort(audioEl, targetEnd) {
+  const EPS = 0.04; // seconds of tolerance
+  return new Promise(resolve => {
+    let rafId = null;
+    function tick() {
+      if (seqState.abort) { cleanup(); resolve(false); return; }
+      if (seqState.paused) { /* do nothing — waiting handled elsewhere */ }
+      // if audio ended by itself (shouldn't usually for small segments), also stop
+      const cur = audioEl.currentTime;
+      if (cur >= (targetEnd - EPS)) { cleanup(); resolve(true); return; }
+      // if duration known and targetEnd > duration, resolve false to avoid infinite loop
+      if (audioEl.duration && !isNaN(audioEl.duration) && targetEnd > audioEl.duration + 0.1) {
+        cleanup(); resolve(false); return;
+      }
+      rafId = requestAnimationFrame(tick);
+    }
+    function cleanup() { if (rafId) cancelAnimationFrame(rafId); }
+    tick();
+  });
+}
+
+/* Wait while paused: resolves immediately if not paused. When paused, polls until resumed or abort. */
+function waitWhilePaused() {
+  return new Promise(resolve => {
+    if (!seqState.paused) { resolve(); return; }
+    let raf = null;
+    function waitTick() {
+      if (seqState.abort) { if (raf) cancelAnimationFrame(raf); resolve(); return; }
+      if (!seqState.paused) { if (raf) cancelAnimationFrame(raf); resolve(); return; }
+      raf = requestAnimationFrame(waitTick);
+    }
+    waitTick();
+  });
+}
+
+playSequenceBtn.addEventListener('click', ()=>{
+  if (seqState.status === 'playing') return;
+  // start playing
+  playSequence().catch(e => {
+    console.error('playSequence error', e);
+    seqState.status = 'stopped';
+    updateStatus();
+  });
+});
+
+pauseSequenceBtn.addEventListener('click', ()=> {
+  if (seqState.status === 'playing' && !seqState.paused) {
+    seqState.paused = true;
+    // pause all audio elements
+    Object.values(trackAudioEls).forEach(a=>a.pause());
+    updateStatus();
+  } else if (seqState.status === 'playing' && seqState.paused) {
+    seqState.paused = false;
+    updateStatus();
+    // note: sequence awaits waitWhilePaused and will resume playing the current audio; 
+    // the audio.play() call will happen from the sequence loop
+  }
+});
+
+stopSequenceBtn.addEventListener('click', ()=> {
+  if (seqState.status === 'stopped') return;
+  seqState.abort = true;
+  seqState.paused = false;
+  // pause all audios
+  Object.values(trackAudioEls).forEach(a=>{a.pause();});
+  updateStatus();
+});
+
+function updateStatus() {
+  statusDiv.textContent = seqState.status === 'playing' ? (seqState.paused ? 'Paused' : 'Playing') : 'Stopped';
+  if (seqState.status !== 'playing') {
+    // reset playing state
+    seqState.status = 'stopped';
+    seqState.paused = false;
+    seqState.abort = false;
+  } else {
+    // ensure status remains 'playing'
+    seqState.status = 'playing';
+  }
+}
+
+/* Export / Import JSON */
+exportJsonBtn.addEventListener('click', ()=> {
+  const payload = { segments, overallLoops: parseInt(overallLoopsInput.value,10) || 0 };
+  jsonArea.value = JSON.stringify(payload, null, 2);
+});
+importJsonBtn.addEventListener('click', ()=> {
+  if (!jsonArea.value) return alert('Paste JSON into the box first.');
+  try {
+    const parsed = JSON.parse(jsonArea.value);
+    if (!Array.isArray(parsed.segments)) return alert('JSON must have a segments array.');
+    segments = parsed.segments.map(s=>({ id: s.id || cryptoRandomId(), trackId: s.trackId, trackName: s.trackName || s.trackId, start: s.start, end: s.end, repeats: s.repeats || 1 }));
+    overallLoopsInput.value = parsed.overallLoops || 1;
+    renderSegments();
+  } catch (e) { alert('Invalid JSON: ' + e.message); }
+});
+
+/* small helpers */
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+/* init */
+createAudioElements();
+renderTracks();
+renderSegments();
+updateStatus();
+
+/* Simple UX: if audio elements become available later, attach error handlers */
+Object.values(trackAudioEls).forEach(a=>{
+  a.addEventListener('error', (e)=> {
+    console.warn('Audio load error', a.src, e);
+  });
+});
+
+/* End of script */
+  </script>
+</body>
+</html>
