@@ -10,6 +10,20 @@ export default function Player({ track }) {
   const [isPlaying, setIsPlaying] = useState(false);
   const [duration, setDuration] = useState(0);
   const [currentTime, setCurrentTime] = useState(0);
+  const [savedSequences, setSavedSequences] = useState([]);
+  const [showSequenceManager, setShowSequenceManager] = useState(false);
+
+  // Load saved sequences from localStorage on component mount
+  useEffect(() => {
+    const saved = localStorage.getItem('loopcraft-sequences');
+    if (saved) {
+      try {
+        setSavedSequences(JSON.parse(saved));
+      } catch (e) {
+        console.warn('Failed to load saved sequences:', e);
+      }
+    }
+  }, []);
 
   // Reset segments when track changes
   useEffect(() => {
@@ -113,6 +127,50 @@ export default function Player({ track }) {
     audioRef.current?.pause();
     setIsPlaying(false);
   }, []);
+
+  // Save current sequence to localStorage
+  const saveSequence = useCallback((name) => {
+    if (!name.trim() || segments.length === 0) return false;
+    
+    const sequence = {
+      id: Date.now().toString(),
+      name: name.trim(),
+      trackName: track.name,
+      trackUrl: track.url,
+      segments: segments,
+      createdAt: new Date().toISOString(),
+      totalDuration: segments.reduce((total, segment) => {
+        return total + (segment.end - segment.start) * segment.repeat;
+      }, 0)
+    };
+
+    const updated = [...savedSequences, sequence];
+    setSavedSequences(updated);
+    localStorage.setItem('loopcraft-sequences', JSON.stringify(updated));
+    return true;
+  }, [segments, track, savedSequences]);
+
+  // Load a saved sequence
+  const loadSequence = useCallback((sequence) => {
+    if (sequence.trackUrl !== track.url) {
+      window.alert('This sequence was created for a different track. Please select the correct track first.');
+      return;
+    }
+    setSegments(sequence.segments);
+    setShowSequenceManager(false);
+  }, [track.url]);
+
+  // Delete a saved sequence
+  const deleteSequence = useCallback((sequenceId) => {
+    const updated = savedSequences.filter(seq => seq.id !== sequenceId);
+    setSavedSequences(updated);
+    localStorage.setItem('loopcraft-sequences', JSON.stringify(updated));
+  }, [savedSequences]);
+
+  // Get sequences for current track
+  const currentTrackSequences = useMemo(() => {
+    return savedSequences.filter(seq => seq.trackUrl === track.url);
+  }, [savedSequences, track.url]);
 
   // Keyboard shortcuts - placed after function definitions
   useEffect(() => {
@@ -276,14 +334,93 @@ export default function Player({ track }) {
             ))}
           </div>
 
-          {/* Bulk Actions */}
-          <div className="mt-3 pt-3 border-t border-gray-200">
+          {/* Sequence Actions */}
+          <div className="mt-3 pt-3 border-t border-gray-200 flex items-center justify-between">
             <button
               onClick={() => setSegments([])}
               className="text-sm text-red-600 hover:text-red-700 transition-colors"
             >
               Clear All Segments
             </button>
+            <div className="flex items-center space-x-2">
+              <button
+                onClick={() => {
+                  const name = window.prompt('Enter a name for this sequence:');
+                  if (name && saveSequence(name)) {
+                    window.alert('Sequence saved successfully!');
+                  }
+                }}
+                className="text-sm bg-green-500 text-white px-3 py-1 rounded hover:bg-green-600 transition-colors"
+                title="Save current sequence"
+              >
+                Save Sequence
+              </button>
+              {currentTrackSequences.length > 0 && (
+                <button
+                  onClick={() => setShowSequenceManager(!showSequenceManager)}
+                  className="text-sm bg-blue-500 text-white px-3 py-1 rounded hover:bg-blue-600 transition-colors"
+                  title="Load saved sequence"
+                >
+                  Load ({currentTrackSequences.length})
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Sequence Manager */}
+      {showSequenceManager && currentTrackSequences.length > 0 && (
+        <div className="p-4 border-b border-gray-100 bg-blue-50">
+          <div className="flex items-center justify-between mb-3">
+            <h4 className="font-medium text-gray-800">Saved Sequences for {track.name}</h4>
+            <button
+              onClick={() => setShowSequenceManager(false)}
+              className="text-gray-400 hover:text-gray-600"
+            >
+              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+              </svg>
+            </button>
+          </div>
+          <div className="space-y-2 max-h-48 overflow-y-auto">
+            {currentTrackSequences.map((sequence) => (
+              <div key={sequence.id} className="flex items-center justify-between bg-white p-3 rounded-lg border">
+                <div className="flex-1 min-w-0">
+                  <div className="font-medium text-gray-800 truncate">{sequence.name}</div>
+                  <div className="text-sm text-gray-500 flex items-center space-x-2">
+                    <span>{sequence.segments.length} segments</span>
+                    <span>•</span>
+                    <span>{formatTime(sequence.totalDuration)}</span>
+                    <span>•</span>
+                    <span>{new Date(sequence.createdAt).toLocaleDateString()}</span>
+                  </div>
+                </div>
+                <div className="flex items-center space-x-2 ml-2">
+                  <button
+                    onClick={() => loadSequence(sequence)}
+                    className="text-sm bg-blue-500 text-white px-2 py-1 rounded hover:bg-blue-600 transition-colors"
+                    title="Load this sequence"
+                  >
+                    Load
+                  </button>
+                  <button
+                    onClick={() => {
+                      if (window.confirm(`Delete sequence "${sequence.name}"?`)) {
+                        deleteSequence(sequence.id);
+                      }
+                    }}
+                    className="text-red-500 hover:bg-red-50 p-1 rounded transition-colors"
+                    title="Delete sequence"
+                  >
+                    <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z" clipRule="evenodd" />
+                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       )}
@@ -327,6 +464,23 @@ export default function Player({ track }) {
             </svg>
             <span>Stop</span>
           </button>
+        )}
+
+        {/* Quick Actions */}
+        {!hasSegments && currentTrackSequences.length > 0 && (
+          <div className="mt-3 p-3 bg-blue-50 rounded-lg">
+            <div className="flex items-center justify-between">
+              <div className="text-sm text-blue-800">
+                {currentTrackSequences.length} saved sequence{currentTrackSequences.length !== 1 ? 's' : ''} available
+              </div>
+              <button
+                onClick={() => setShowSequenceManager(true)}
+                className="text-sm bg-blue-500 text-white px-3 py-1 rounded hover:bg-blue-600 transition-colors"
+              >
+                Load Sequence
+              </button>
+            </div>
+          </div>
         )}
 
         {/* Keyboard Shortcuts Help */}

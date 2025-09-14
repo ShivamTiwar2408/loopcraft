@@ -40,6 +40,7 @@ npm start
 - 🔄 Infinite loop playback
 - ⌨️ Keyboard shortcuts (Spacebar: play/stop, Ctrl+A: add segment, Escape: stop)
 - 📊 Total loop duration calculation
+- 💾 **Sequence Memory**: Save and load loop sequences with localStorage persistence
 
 ### 📚 Track Management (Optimized for Hundreds of Tracks)
 - 🔍 **Advanced Search**: Search by track name or category
@@ -61,6 +62,7 @@ npm start
 - ⚡ Fast search and filtering
 - 🎯 Sticky player controls
 - 📊 File size and metadata display
+- 💾 **Persistent Sequences**: Automatically saves your loop sequences locally
 
 ## Keyboard Shortcuts
 
@@ -68,6 +70,19 @@ npm start
 - **Ctrl/Cmd + A**: Add current segment
 - **Escape**: Stop playback
 - **Arrow Keys**: Navigate through tracks (when focused)
+
+## Sequence Management
+
+### 💾 **Save & Load Sequences**
+- **Save**: Click "Save Sequence" after creating segments to store your loop
+- **Load**: Use "Load" button to restore previously saved sequences
+- **Auto-Save**: Sequences are automatically saved to browser localStorage
+- **Per-Track**: Sequences are organized by track for easy access
+
+### 🔄 **Import/Export**
+- **Export**: Download all sequences as JSON file for backup
+- **Import**: Upload JSON file to restore sequences
+- **Cross-Device**: Transfer sequences between devices using export/import
 
 ## Organization Tips for Large Libraries
 

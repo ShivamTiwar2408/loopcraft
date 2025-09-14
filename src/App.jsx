@@ -1,11 +1,13 @@
 import { useEffect, useState } from "react";
 import Player from "./components/Player";
 import TrackBrowser from "./components/TrackBrowser";
+import SequenceManager from "./components/SequenceManager";
 
 function App() {
   const [tracks, setTracks] = useState([]);
   const [selectedTrack, setSelectedTrack] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [showSequenceManager, setShowSequenceManager] = useState(false);
 
   useEffect(() => {
     setIsLoading(true);
@@ -26,8 +28,22 @@ function App() {
       {/* Header */}
       <div className="bg-white shadow-sm border-b sticky top-0 z-10">
         <div className="max-w-4xl mx-auto px-4 py-4">
-          <h1 className="text-2xl font-bold text-purple-600 text-center">🎵 LoopCraft</h1>
-          <p className="text-gray-500 text-sm text-center mt-1">Craft custom audio loops</p>
+          <div className="flex items-center justify-between">
+            <div className="flex-1 text-center">
+              <h1 className="text-2xl font-bold text-purple-600">🎵 LoopCraft</h1>
+              <p className="text-gray-500 text-sm mt-1">Craft custom audio loops</p>
+            </div>
+            <button
+              onClick={() => setShowSequenceManager(true)}
+              className="flex items-center space-x-2 px-3 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 transition-colors"
+              title="Manage saved sequences"
+            >
+              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M3 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" clipRule="evenodd" />
+              </svg>
+              <span className="text-sm">Sequences</span>
+            </button>
+          </div>
         </div>
       </div>
 
@@ -67,6 +83,12 @@ function App() {
           </div>
         )}
       </div>
+
+      {/* Global Sequence Manager */}
+      <SequenceManager 
+        isOpen={showSequenceManager} 
+        onClose={() => setShowSequenceManager(false)} 
+      />
     </div>
   );
 }
