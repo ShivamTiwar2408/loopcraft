@@ -22,22 +22,34 @@ function generateManifest() {
       if (entry.isDirectory()) {
         // Recursively scan subdirectories
         items.push(...scanDirectory(fullPath, relativeFilePath));
-      } else if (entry.isFile() && entry.name.toLowerCase().endsWith('.mp3')) {
-        const stats = fs.statSync(fullPath);
-        const parsedName = path.parse(entry.name).name;
+      } else if (entry.isFile()) {
+        const ext = path.extname(entry.name).toLowerCase();
+        const supportedFormats = ['.mp3', '.wav', '.m4a', '.mp4', '.webm', '.mov', '.avi'];
         
-        // Extract category from folder structure
-        const category = relativePath || "Uncategorized";
-        
-        items.push({
-          name: parsedName,
-          url: `/assets/${relativeFilePath.replace(/\\/g, '/')}`,
-          category: category,
-          size: stats.size,
-          modified: stats.mtime.toISOString(),
-          // Generate a simple ID for consistent referencing
-          id: Buffer.from(relativeFilePath).toString('base64').replace(/[^a-zA-Z0-9]/g, '').substring(0, 8)
-        });
+        if (supportedFormats.includes(ext)) {
+          const stats = fs.statSync(fullPath);
+          const parsedName = path.parse(entry.name).name;
+          
+          // Extract category from folder structure
+          const category = relativePath || "Uncategorized";
+          
+          // Determine media type
+          const audioFormats = ['.mp3', '.wav', '.m4a'];
+          const videoFormats = ['.mp4', '.webm', '.mov', '.avi'];
+          const mediaType = audioFormats.includes(ext) ? 'audio' : 'video';
+          
+          items.push({
+            name: parsedName,
+            url: `/assets/${relativeFilePath.replace(/\\/g, '/')}`,
+            category: category,
+            size: stats.size,
+            modified: stats.mtime.toISOString(),
+            mediaType: mediaType,
+            format: ext.substring(1), // Remove the dot
+            // Generate a simple ID for consistent referencing
+            id: Buffer.from(relativeFilePath).toString('base64').replace(/[^a-zA-Z0-9]/g, '').substring(0, 8)
+          });
+        }
       }
     }
     
@@ -57,10 +69,15 @@ function generateManifest() {
   fs.writeFileSync(manifestFile, JSON.stringify(manifest, null, 2));
   
   const categories = [...new Set(manifest.map(track => track.category))];
-  console.log(`✅ Manifest generated with ${manifest.length} tracks across ${categories.length} categories:`);
+  const audioCount = manifest.filter(item => item.mediaType === 'audio').length;
+  const videoCount = manifest.filter(item => item.mediaType === 'video').length;
+  
+  console.log(`✅ Manifest generated with ${manifest.length} media files (${audioCount} audio, ${videoCount} video) across ${categories.length} categories:`);
   categories.forEach(cat => {
-    const count = manifest.filter(track => track.category === cat).length;
-    console.log(`   📁 ${cat}: ${count} tracks`);
+    const count = manifest.filter(item => item.category === cat).length;
+    const audioInCat = manifest.filter(item => item.category === cat && item.mediaType === 'audio').length;
+    const videoInCat = manifest.filter(item => item.category === cat && item.mediaType === 'video').length;
+    console.log(`   📁 ${cat}: ${count} files (${audioInCat} audio, ${videoInCat} video)`);
   });
 }
 

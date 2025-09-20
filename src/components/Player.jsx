@@ -1,7 +1,7 @@
 import { useRef, useState, useCallback, useEffect, useMemo } from "react";
 
 export default function Player({ track }) {
-  const audioRef = useRef(null);
+  const mediaRef = useRef(null);
   const playbackControlRef = useRef({ shouldStop: false });
   const [segments, setSegments] = useState([]);
   const [start, setStart] = useState(0);
@@ -34,20 +34,20 @@ export default function Player({ track }) {
 
   // Update duration and current time
   useEffect(() => {
-    const audio = audioRef.current;
-    if (!audio) return;
+    const media = mediaRef.current;
+    if (!media) return;
 
-    const updateTime = () => setCurrentTime(audio.currentTime);
-    const updateDuration = () => setDuration(audio.duration || 0);
+    const updateTime = () => setCurrentTime(media.currentTime);
+    const updateDuration = () => setDuration(media.duration || 0);
 
-    audio.addEventListener('timeupdate', updateTime);
-    audio.addEventListener('loadedmetadata', updateDuration);
-    audio.addEventListener('durationchange', updateDuration);
+    media.addEventListener('timeupdate', updateTime);
+    media.addEventListener('loadedmetadata', updateDuration);
+    media.addEventListener('durationchange', updateDuration);
 
     return () => {
-      audio.removeEventListener('timeupdate', updateTime);
-      audio.removeEventListener('loadedmetadata', updateDuration);
-      audio.removeEventListener('durationchange', updateDuration);
+      media.removeEventListener('timeupdate', updateTime);
+      media.removeEventListener('loadedmetadata', updateDuration);
+      media.removeEventListener('durationchange', updateDuration);
     };
   }, [track.url]);
 
@@ -76,18 +76,18 @@ export default function Player({ track }) {
         return;
       }
 
-      const audio = audioRef.current;
-      if (!audio) {
+      const media = mediaRef.current;
+      if (!media) {
         resolve();
         return;
       }
 
-      audio.currentTime = startTime;
-      audio.play().catch(() => resolve());
+      media.currentTime = startTime;
+      media.play().catch(() => resolve());
 
       const checkTime = () => {
-        if (playbackControlRef.current.shouldStop || audio.currentTime >= endTime) {
-          audio.pause();
+        if (playbackControlRef.current.shouldStop || media.currentTime >= endTime) {
+          media.pause();
           resolve();
         } else {
           requestAnimationFrame(checkTime);
@@ -124,7 +124,7 @@ export default function Player({ track }) {
 
   const stopPlayback = useCallback(() => {
     playbackControlRef.current.shouldStop = true;
-    audioRef.current?.pause();
+    mediaRef.current?.pause();
     setIsPlaying(false);
   }, []);
 
@@ -222,19 +222,48 @@ export default function Player({ track }) {
 
   return (
     <div className="bg-white m-4 rounded-xl shadow-sm overflow-hidden">
-      {/* Audio Element (Hidden) */}
-      <audio ref={audioRef} src={track.url} preload="metadata" />
+      {/* Media Element */}
+      {track.mediaType === 'video' ? (
+        <div className="relative">
+          <video 
+            ref={mediaRef} 
+            src={track.url} 
+            preload="metadata"
+            className="w-full max-h-64 bg-black"
+            controls={false}
+            muted={false}
+          />
+          {/* Video overlay controls could go here if needed */}
+        </div>
+      ) : (
+        <audio ref={mediaRef} src={track.url} preload="metadata" />
+      )}
 
       {/* Now Playing Header */}
-      <div className="bg-gradient-to-r from-purple-500 to-blue-500 text-white p-4">
+      <div className={`${track.mediaType === 'video' ? 'bg-gradient-to-r from-red-500 to-pink-500' : 'bg-gradient-to-r from-purple-500 to-blue-500'} text-white p-4`}>
         <div className="flex items-center space-x-3">
           <div className="w-12 h-12 bg-white/20 rounded-lg flex items-center justify-center">
-            <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
-              <path fillRule="evenodd" d="M9.383 3.076A1 1 0 0110 4v12a1 1 0 01-1.617.793l-4-3A1 1 0 014 13V7a1 1 0 01.383-.793l4-3zM14 7a1 1 0 011-1h2a1 1 0 110 2h-2a1 1 0 01-1-1zM14 12a1 1 0 011-1h2a1 1 0 110 2h-2a1 1 0 01-1-1z" clipRule="evenodd" />
-            </svg>
+            {track.mediaType === 'video' ? (
+              <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
+                <path d="M2 6a2 2 0 012-2h6a2 2 0 012 2v8a2 2 0 01-2 2H4a2 2 0 01-2-2V6zM14.553 7.106A1 1 0 0014 8v4a1 1 0 00.553.894l2 1A1 1 0 0018 13V7a1 1 0 00-1.447-.894l-2 1z" />
+              </svg>
+            ) : (
+              <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M9.383 3.076A1 1 0 0110 4v12a1 1 0 01-1.617.793l-4-3A1 1 0 014 13V7a1 1 0 01.383-.793l4-3zM14 7a1 1 0 011-1h2a1 1 0 110 2h-2a1 1 0 01-1-1zM14 12a1 1 0 011-1h2a1 1 0 110 2h-2a1 1 0 01-1-1z" clipRule="evenodd" />
+              </svg>
+            )}
           </div>
           <div className="flex-1 min-w-0">
-            <h3 className="font-semibold truncate">{track.name}</h3>
+            <div className="flex items-center space-x-2">
+              <h3 className="font-semibold truncate">{track.name}</h3>
+              <span className={`px-2 py-1 text-xs rounded-full ${
+                track.mediaType === 'video' 
+                  ? 'bg-white/20 text-white' 
+                  : 'bg-white/20 text-white'
+              }`}>
+                {track.mediaType === 'video' ? '🎥' : '🎵'} {track.format?.toUpperCase()}
+              </span>
+            </div>
             <p className="text-white/80 text-sm">
               {formatTime(currentTime)} / {formatTime(duration)}
             </p>

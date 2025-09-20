@@ -31,7 +31,7 @@ function App() {
           <div className="flex items-center justify-between">
             <div className="flex-1 text-center">
               <h1 className="text-2xl font-bold text-purple-600">🎵 LoopCraft</h1>
-              <p className="text-gray-500 text-sm mt-1">Craft custom audio loops</p>
+              <p className="text-gray-500 text-sm mt-1">Craft custom audio & video loops</p>
             </div>
             <button
               onClick={() => setShowSequenceManager(true)}
@@ -60,7 +60,7 @@ function App() {
           </div>
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 p-4">
-            {/* Track Browser */}
+            {/* Media Browser */}
             <TrackBrowser
               tracks={tracks}
               selectedTrack={selectedTrack}
@@ -75,8 +75,8 @@ function App() {
               ) : (
                 <div className="bg-white rounded-xl shadow-sm p-8 text-center">
                   <div className="text-gray-300 text-5xl mb-4">🎵</div>
-                  <h3 className="text-lg font-medium text-gray-800 mb-2">Select a Track</h3>
-                  <p className="text-gray-500">Choose a track from the library to start creating loops</p>
+                  <h3 className="text-lg font-medium text-gray-800 mb-2">Select Media</h3>
+                  <p className="text-gray-500">Choose audio or video from the library to start creating loops</p>
                 </div>
               )}
             </div>

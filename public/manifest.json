@@ -5,6 +5,8 @@
     "category": "Uncategorized",
     "size": 84611795,
     "modified": "2025-09-14T16:13:19.508Z",
+    "mediaType": "audio",
+    "format": "mp3",
     "id": "MTEgMTc0"
   },
   {
@@ -13,6 +15,18 @@
     "category": "Uncategorized",
     "size": 44450096,
     "modified": "2025-09-14T09:55:58.806Z",
+    "mediaType": "audio",
+    "format": "mp3",
     "id": "QmVzdCBv"
+  },
+  {
+    "name": "bg_108",
+    "url": "/assets/bg_108.mp4",
+    "category": "Uncategorized",
+    "size": 75223693,
+    "modified": "2025-09-20T02:45:19.250Z",
+    "mediaType": "video",
+    "format": "mp4",
+    "id": "YmdfMTA4"
   }
 ]
