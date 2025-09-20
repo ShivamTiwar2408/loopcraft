@@ -189,6 +189,19 @@ export default function SequenceManager({ isOpen, onClose }) {
                         <span>{formatTime(sequence.totalDuration)} total</span>
                         <span>{new Date(sequence.createdAt).toLocaleDateString()}</span>
                       </div>
+                      {/* Show segment labels if available */}
+                      {sequence.segments.length > 0 && (
+                        <div className="mt-2 flex flex-wrap gap-1">
+                          {sequence.segments.slice(0, 3).map((segment, index) => (
+                            <span key={index} className="bg-gray-100 text-gray-600 px-2 py-1 rounded text-xs">
+                              {segment.label || `Segment ${index + 1}`}
+                            </span>
+                          ))}
+                          {sequence.segments.length > 3 && (
+                            <span className="text-gray-400 text-xs">+{sequence.segments.length - 3} more</span>
+                          )}
+                        </div>
+                      )}
                     </div>
                     <div className="flex items-center space-x-2 ml-4">
                       <button

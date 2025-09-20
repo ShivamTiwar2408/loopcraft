@@ -28,3 +28,15 @@ yarn-error.log*
 
 # Vercel
 .vercel
+
+# Large media files
+*.mp4
+*.mov
+*.avi
+*.mkv
+*.webm
+public/assets/*.mp4
+public/assets/*.mov
+public/assets/*.avi
+public/assets/*.mkv
+public/assets/*.webm

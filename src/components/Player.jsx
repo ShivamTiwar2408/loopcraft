@@ -12,6 +12,7 @@ export default function Player({ track }) {
   const [currentTime, setCurrentTime] = useState(0);
   const [savedSequences, setSavedSequences] = useState([]);
   const [showSequenceManager, setShowSequenceManager] = useState(false);
+  const [editingSegmentIndex, setEditingSegmentIndex] = useState(null);
 
   // Load saved sequences from localStorage on component mount
   useEffect(() => {
@@ -59,14 +60,33 @@ export default function Player({ track }) {
 
   const addSegment = useCallback(() => {
     if (start >= end || start < 0 || repeat < 1) return;
-    setSegments(prev => [...prev, { start, end, repeat }]);
+    const segmentNumber = segments.length + 1;
+    setSegments(prev => [...prev, { 
+      start, 
+      end, 
+      repeat, 
+      label: `Segment ${segmentNumber}` 
+    }]);
     // Reset inputs for next segment
     setStart(end);
     setEnd(Math.min(end + 5, duration));
-  }, [start, end, repeat, duration]);
+  }, [start, end, repeat, duration, segments.length]);
 
   const deleteSegment = useCallback((index) => {
     setSegments(prev => prev.filter((_, i) => i !== index));
+  }, []);
+
+  const updateSegmentLabel = useCallback((index, newLabel) => {
+    setSegments(prev => prev.map((segment, i) => 
+      i === index ? { ...segment, label: newLabel } : segment
+    ));
+  }, []);
+
+  const updateSegmentRepeat = useCallback((index, newRepeat) => {
+    if (newRepeat < 1) return;
+    setSegments(prev => prev.map((segment, i) => 
+      i === index ? { ...segment, repeat: newRepeat } : segment
+    ));
   }, []);
 
   const playSegment = useCallback((startTime, endTime) => {
@@ -156,7 +176,12 @@ export default function Player({ track }) {
       window.alert('This sequence was created for a different track. Please select the correct track first.');
       return;
     }
-    setSegments(sequence.segments);
+    // Ensure backward compatibility by adding labels to segments that don't have them
+    const segmentsWithLabels = sequence.segments.map((segment, index) => ({
+      ...segment,
+      label: segment.label || `Segment ${index + 1}`
+    }));
+    setSegments(segmentsWithLabels);
     setShowSequenceManager(false);
   }, [track.url]);
 
@@ -333,32 +358,93 @@ export default function Player({ track }) {
               Total: {formatTime(totalLoopDuration)}
             </div>
           </div>
-          <div className="space-y-2 max-h-40 overflow-y-auto">
+          <div className="space-y-3 max-h-60 overflow-y-auto">
             {segments.map((segment, index) => (
-              <div key={index} className="flex items-center justify-between bg-gray-50 p-3 rounded-lg">
-                <div className="flex-1">
-                  <div className="flex items-center space-x-2 text-sm">
-                    <span className="text-purple-600 font-medium">#{index + 1}</span>
-                    <span className="text-gray-600">
-                      {formatTime(segment.start)} → {formatTime(segment.end)}
-                    </span>
-                    <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs">
-                      ×{segment.repeat}
-                    </span>
-                    <span className="text-xs text-gray-400">
-                      ({formatTime((segment.end - segment.start) * segment.repeat)})
-                    </span>
+              <div key={index} className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                {/* Segment Header */}
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center space-x-2">
+                    <span className="text-purple-600 font-medium text-sm">#{index + 1}</span>
+                    {editingSegmentIndex === index ? (
+                      <input
+                        type="text"
+                        value={segment.label || `Segment ${index + 1}`}
+                        onChange={(e) => updateSegmentLabel(index, e.target.value)}
+                        onBlur={() => setEditingSegmentIndex(null)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === 'Escape') {
+                            setEditingSegmentIndex(null);
+                          }
+                        }}
+                        className="bg-white border border-gray-200 rounded px-2 py-1 text-sm font-medium text-gray-800 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                        style={{ width: '200px' }}
+                        maxLength={25}
+                        placeholder="Segment label"
+                        autoFocus
+                      />
+                    ) : (
+                      <span className="text-sm font-medium text-gray-800 px-2 py-1">
+                        {segment.label || `Segment ${index + 1}`}
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-center space-x-1">
+                    <button
+                      onClick={() => setEditingSegmentIndex(index)}
+                      className="text-blue-500 hover:bg-blue-100 p-1 rounded transition-colors"
+                      title="Edit segment name"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                      </svg>
+                    </button>
+                    <button
+                      onClick={() => deleteSegment(index)}
+                      className="text-red-500 hover:bg-red-100 p-1 rounded transition-colors"
+                      title="Delete segment"
+                    >
+                      <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                      </svg>
+                    </button>
                   </div>
                 </div>
-                <button
-                  onClick={() => deleteSegment(index)}
-                  className="text-red-500 hover:bg-red-50 p-1 rounded transition-colors"
-                  title="Delete segment"
-                >
-                  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
-                  </svg>
-                </button>
+
+                {/* Segment Details */}
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-3 text-sm text-gray-600">
+                    <span>
+                      {formatTime(segment.start)} → {formatTime(segment.end)}
+                    </span>
+                    <span className="text-xs text-gray-400">
+                      ({formatTime((segment.end - segment.start) * segment.repeat)} total)
+                    </span>
+                  </div>
+
+                  {/* Repeat Controls */}
+                  <div className="flex items-center space-x-2">
+                    <span className="text-xs text-gray-500">Repeat:</span>
+                    <button
+                      onClick={() => updateSegmentRepeat(index, segment.repeat - 1)}
+                      disabled={segment.repeat <= 1}
+                      className="w-6 h-6 bg-gray-200 hover:bg-gray-300 disabled:bg-gray-100 disabled:text-gray-400 text-gray-600 rounded flex items-center justify-center text-sm font-medium transition-colors"
+                      title="Decrease repeat count"
+                    >
+                      −
+                    </button>
+                    <span className="bg-blue-100 text-blue-800 px-3 py-1 rounded text-sm font-medium min-w-[40px] text-center">
+                      {segment.repeat}
+                    </span>
+                    <button
+                      onClick={() => updateSegmentRepeat(index, segment.repeat + 1)}
+                      disabled={segment.repeat >= 10}
+                      className="w-6 h-6 bg-gray-200 hover:bg-gray-300 disabled:bg-gray-100 disabled:text-gray-400 text-gray-600 rounded flex items-center justify-center text-sm font-medium transition-colors"
+                      title="Increase repeat count"
+                    >
+                      +
+                    </button>
+                  </div>
+                </div>
               </div>
             ))}
           </div>
